@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f4ed">
+  <title>Empório da Música · Seu próximo acorde</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="./" aria-label="Empório da Música, início"><span class="brand-icon">♮</span><span>EMPÓRIO<br><small>DA MÚSICA</small></span></a>
+    <div class="side-middle"><span class="eyebrow">FEITO PARA QUEM SENTE</span><h1>A música<br>começa com<br>uma boa<br><em>conversa.</em></h1><p>Do primeiro instrumento ao próximo palco. Vamos encontrar o seu som.</p><div class="sound-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="side-footer"><span class="location-dot"></span> Campo Grande, MS <span class="since">Instrumentos & boas histórias.</span></div>
+  </aside>
+  <main>
+    <header><div class="assistant-heading"><span class="avatar">e<span>♪</span></span><div><strong>Seu parceiro de música</strong><span class="status"><i></i> Prévia interativa · respostas de exemplo</span></div></div><button id="reset" class="reset" title="Começar uma nova conversa"><span>↺</span> Nova conversa</button></header>
+    <section class="conversation" id="conversation" aria-label="Conversa" aria-live="polite">
+      <div class="intro" id="intro"><span class="eyebrow">BEM-VINDO AO EMPÓRIO</span><h2>Qual vai ser o seu<br><em>próximo acorde?</em></h2><p>Conte o que você procura. A gente encontra o ritmo.</p>
+        <div class="suggestions">
+          <button data-prompt="Estou começando. Qual violão de nylon posso comprar até R$ 1.000?"><span class="tile-icon">♬</span><strong>Encontrar meu instrumento</strong><span>Um violão para começar, até R$ 1.000</span><b>↗</b></button>
+          <button data-prompt="Quero consultar o status do meu pedido."><span class="tile-icon">▱</span><strong>Acompanhar um pedido</strong><span>Entenda como consultar sua compra</span><b>↗</b></button>
+          <button data-prompt="Como funciona a devolução de uma compra online?"><span class="tile-icon">↶</span><strong>Trocas sem complicação</strong><span>Vamos entender sua situação</span><b>↗</b></button>
+        </div>
+        <div class="welcome-note"><span>✦</span> Instrumentos, condições de pagamento e políticas da loja.</div>
+      </div>
+      <div id="messages" class="messages"></div>
+    </section>
+    <div class="composer-area"><div id="followups" class="followups"></div><form id="chat-form"><label class="sr-only" for="message">Sua mensagem</label><textarea id="message" placeholder="Vamos falar de música. Como posso ajudar?" rows="1" maxlength="1500"></textarea><button type="submit" id="send" aria-label="Enviar mensagem">↑</button></form><div class="composer-footer"><span><i></i> Demo visual · sem conexão com a IA</span><span>Enter para enviar</span></div></div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

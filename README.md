@@ -2,6 +2,8 @@
 
 A Python customer-service agent for Artefact's AI Engineer challenge. It helps customers find instruments, consult store policies, calculate payment quotes and check authorized orders using the supplied CSV files and policy PDF.
 
+Repository: [github.com/lm1sz/artefact-ai-engineer-case](https://github.com/lm1sz/artefact-ai-engineer-case)
+
 ## Run the project
 
 Python 3.11+ is required. From the repository root on Windows:

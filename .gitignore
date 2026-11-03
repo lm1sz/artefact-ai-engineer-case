@@ -11,9 +11,4 @@ dist/
 private/
 *.eml
 *.zip
-
-# Local study notes and historical reviews; keep the English case summary public.
-chatbot/docs/AVALIACAO_DO_MODELO.md
-chatbot/docs/GUIA_DA_BASE.md
-chatbot/docs/SIMULACAO_PROMOCOES_PARCELAS_DEVOLUCAO.md
-chatbot/docs/implementation.md
+output/

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -67,7 +68,6 @@ REVIEW = {
 
 def texto_referencia(scenario: str, results: list[dict], question: str) -> str:
     """Monta resposta de referencia com resultados reais; nao e texto de um modelo.
-    Build reference wording from real tool results; this is not model-generated text.
     """
     result = results[-1]
     if result.get("error") == "installment_below_minimum":
@@ -135,13 +135,11 @@ class FixtureProvider:
     """
     def __init__(self, name: str, calls: list):
         """Prepara chamadas roteirizadas para exemplos offline identificados.
-        Prepare scripted calls for explicitly labeled offline examples.
         """
         self.name, self.calls, self.position = name, calls, 0
 
     def responder(self, *, instructions, items, tool_choice):
         """Reproduz uma chamada por rodada, sem acessar qualquer modelo ou API.
-        Replay one call per round without accessing any model or API.
         """
         if self.position < len(self.calls):
             name, args = self.calls[self.position]
@@ -158,7 +156,6 @@ class FixtureProvider:
 
 class FerramentasAvaliacao(Tools):
     """Registra operações e resultados para revisar as respostas com evidências.
-    Record operations and results for evidence-based response review.
     """
     def executar(self, name, arguments):
         result = super().executar(name, arguments)
@@ -168,7 +165,6 @@ class FerramentasAvaliacao(Tools):
 
 def verificar_chamadas(expected: list, actual: list[dict]) -> list[str]:
     """Sinaliza desvios nos argumentos criticos; nao julga a qualidade do texto.
-    Flag critical argument deviations; do not judge answer quality.
     """
     issues = []
     for name, arguments in expected:
@@ -176,7 +172,6 @@ def verificar_chamadas(expected: list, actual: list[dict]) -> list[str]:
         if not matching:
             issues.append(f"Review missing expected tool: {name}")
         # Busca textual pode variar; valores de pagamento/devolucao exigem evidencia.
-        # Search wording may vary; payment/return values require evidence.
         if name in ("avaliar_devolucao", "cotar_pagamento"):
             if any(call["arguments"] != arguments for call in matching):
                 issues.append(f"Review unexpected customer facts or quote parameters: {name}")
@@ -188,26 +183,31 @@ def verificar_chamadas(expected: list, actual: list[dict]) -> list[str]:
 
 def principal():
     """Exporta cenarios offline ou reais conforme a opcao escolhida.
-    Export offline or live scenarios according to the selected option.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     mode_args = parser.add_mutually_exclusive_group(required=True)
     mode_args.add_argument("--offline", action="store_true", help="Generate explicitly labeled reference transcripts, no API calls.")
     mode_args.add_argument("--live", action="store_true", help="Run the configured model; consumes API quota.")
-    parser.add_argument("--output", type=Path, help="Default: examples/reference or private/live-evaluation.")
+    parser.add_argument("--output", type=Path, help="Default: private/offline-evaluation or private/live-evaluation.")
     parser.add_argument("--scenario", choices=[s["name"] for s in SCENARIOS], help="Run only one scenario.")
     args = parser.parse_args()
     carregar_ambiente(ROOT / ".env")
     store = Store(localizar_dados(os.getenv("EMPORIO_DATA_DIR") or None))
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    output = args.output or ROOT / ("examples/reference" if args.offline else f"private/live-evaluation/{run_id}")
+    output = args.output or ROOT / ("private/offline-evaluation" if args.offline else f"private/live-evaluation/{run_id}")
     output.mkdir(parents=True, exist_ok=True)
     settings = {"provider": "fixture", "model": None, "reasoning_effort": None} if args.offline else configuracao_provedor()
     mode = "OFFLINE REFERENCE — scripted tool calls and fixed reference replies; no model/API execution" if args.offline else f"LIVE {settings['provider'].upper()} RUN — inspect manually before submitting"
     report = {"mode": mode, "generated_at_utc": datetime.now(timezone.utc).isoformat(),
               "provider": settings["provider"], "model": settings["model"],
               "reasoning_effort": settings["reasoning_effort"], "scenarios": []}
+    # Identify executable sources and input data, including uncommitted changes.
+    # A commit id alone would not identify the version actually exercised here.
+    inputs = sorted([*ROOT.glob('*.py'), ROOT / 'prompt.txt', *ROOT.glob('data/*')])
+    report['input_sha256'] = {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                             for p in inputs if p.is_file()}
     provider = None if args.offline else criar_provedor()
+    quota_block = None
     for scenario in SCENARIOS:
         if args.scenario and scenario["name"] != args.scenario:
             continue
@@ -217,6 +217,7 @@ def principal():
         registro = {"name": scenario["name"], "completed": True, "turns": [],
                     "quality_review": "pending human review" if not args.offline else "reference only",
                     "review_criteria": REVIEW[scenario["name"]], "review_flags": []}
+        report["scenarios"].append(registro)
         content = [f"# {scenario['name'].replace('_', ' ')}", "", mode, "",
                    f"Session: {'guest' if scenario['customer'] is None else 'local demo customer ' + str(scenario['customer'])}", ""]
         if not args.offline:
@@ -225,18 +226,26 @@ def principal():
         for question, calls in scenario["turns"]:
             if args.offline:
                 agent.provider = FixtureProvider(scenario["name"], calls)
+            print(f"Running {scenario['name']} turn {len(registro['turns']) + 1}", flush=True)
             start = perf_counter()
             first_tool = len(tools.evidencias)
             try:
+                # A daily quota applies to the account, not just this scenario.
+                # Keep the remaining scenarios visible without more HTTP calls.
+                if quota_block is not None:
+                    raise quota_block
                 reply = agent.perguntar(question)
             except ProviderError as error:
+                if getattr(error, "reason", None) in ('tokens_per_day', 'requests_per_day'):
+                    quota_block = error
                 registro["completed"] = False
                 registro["turns"].append({"question": question, "error": str(error),
+                    "reason": getattr(error, "reason", None),
                     "elapsed_seconds": round(perf_counter() - start, 3),
                     "tool_calls": tools.evidencias[first_tool:]})
                 content.extend([f"**Customer:** {question}", "", f"**Execution error:** {error}", ""])
                 break
-            registro["turns"].append({"question": question, "answer": reply.text,
+            registro["turns"].append({"question": question, "answer": reply.text, "checks": reply.checks,
                 "elapsed_seconds": round(perf_counter() - start, 3),
                 "tool_calls": tools.evidencias[first_tool:]})
             content.extend([f"**Customer:** {question}", "", f"**Assistant:** {reply.text}", "",
@@ -244,11 +253,13 @@ def principal():
             flags = verificar_chamadas(calls, tools.evidencias[first_tool:])
             registro["turns"][-1]["review_flags"] = flags
             registro["review_flags"].extend(flags)
+            report["provider_diagnostics"] = getattr(provider, "diagnostics", {})
+            (output / "run.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         content.extend(["## Review criteria", "", REVIEW[scenario["name"]], "",
                         "Automated call checks: " + ("; ".join(registro["review_flags"]) or "no flags"),
                         "Answer quality still requires human review; these checks are not a model-quality score.", ""])
         (output / f"{scenario['name']}.md").write_text("\n".join(content), encoding="utf-8")
-        report["scenarios"].append(registro)
+        report["provider_diagnostics"] = getattr(provider, "diagnostics", {})
         (output / "run.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"Exported {scenario['name']} ({'completed' if registro['completed'] else 'failed'})", flush=True)
     print(f"Evidence saved to: {output}")

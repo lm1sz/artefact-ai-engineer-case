@@ -1,7 +1,7 @@
 import copy
 import json
 import unittest
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from chatbot.data import Store, localizar_dados
@@ -104,7 +104,7 @@ class ToolTests(unittest.TestCase):
         self.store.products[81].update(price_brl="960", status="active", stock_quantity="10")
         self.store.tables["promotions"] = []
         self.assertEqual(self.tools.cotar_pagamento(81, 1, "credit", 12)["error"], "installment_below_minimum")
-        self.assertEqual(self.tools.cotar_pagamento(81, 1, "credit", 6)["approx_installment_brl"], "160.00")
+        self.assertEqual(self.tools.cotar_pagamento(81, 1, "credit", 6)["installment_amounts_brl"], ["160.00"] * 6)
         self.assertEqual(self.tools.cotar_pagamento(81, 1, "pix", 2)["error"], "installments_require_credit")
 
     def test_exact_installments_preserve_total_and_each_minimum(self):

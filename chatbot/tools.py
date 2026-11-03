@@ -14,7 +14,6 @@ from .data import Store, normalizar_texto
 @dataclass(frozen=True)
 class Session:
     # A aplicação fornece a identidade; mensagens e argumentos não podem alterá-la.
-    # The application supplies identity; messages and arguments cannot change it.
     customer_id: int | None = None
 
 
@@ -44,19 +43,15 @@ class Tools:
 
     def executar(self, name: str, arguments: object) -> dict:
         """Valida nome, campos, tipos e limites antes de executar a ferramenta permitida.
-        Validate name, fields, types and bounds before running the allowed tool.
         """
         # 1. Procura a ferramenta na lista permitida.
-        # 1. Look up the tool in the allowlist.
         esquema = PARAMETROS_FERRAMENTAS.get(name) if isinstance(name, str) else None
         if esquema is None:
             return {"error": "tool_not_allowed"}
         # 2. Exige um dicionário com exatamente os campos declarados.
-        # 2. Require a dictionary with exactly the declared fields.
         if not isinstance(arguments, dict) or set(arguments) != set(esquema["properties"]):
             return {"error": "invalid_arguments"}
         # 3. Confere cada tipo, valor nulo permitido e opção enumerada.
-        # 3. Check each type, allowed null value and enumerated option.
         for key, value in arguments.items():
             rule = esquema["properties"][key]
             types = rule["type"] if isinstance(rule["type"], list) else [rule["type"]]
@@ -69,20 +64,18 @@ class Tools:
             if not valid or ("enum" in rule and value not in rule["enum"]):
                 return {"error": "invalid_arguments"}
             # 4. Rejeita valores não finitos e números fora dos limites.
-            # 4. Reject non-finite values and out-of-bounds numbers.
             if isinstance(value, (float, int)) and not isinstance(value, bool):
                 if (value < rule.get("minimum", 0) or value > rule.get("maximum", 10**9)
                         or not math.isfinite(value)):
-                    return {"error": "invalid_arguments"}
+                    return {"error": "invalid_arguments", "field": key,
+                            "minimum": rule.get("minimum", 0), "maximum": rule.get("maximum", 10**9),
+                            "action": "Correct this argument using the declared bounds and retry the tool."}
         try:
             # 5. Executa só após validar; a ferramenta verifica as regras de negócio e acesso.
-            # 5. Execute only after validation; the tool checks business and ownership rules.
             result = getattr(self, name)(**arguments)
             # Mascara os dados reconhecidos como proteção adicional; autorização ocorre antes.
-            # Mask recognized data as additional protection; authorization happens earlier.
             return json.loads(self.store.mascarar_dados(json.dumps(result, ensure_ascii=False)))
         # 6. Converte estas falhas previstas em um erro estruturado.
-        # 6. Convert these anticipated failures into a structured error.
         except (ValueError, KeyError, TypeError, ArithmeticError):
             return {"error": "invalid_arguments_or_data", "action": "Ask for clarification or human review."}
 
@@ -99,7 +92,9 @@ class Tools:
         return {
             "product_id": int(row["product_id"]), "name": row["name"],
             "category": self.store.categories[row["category_id"]],
-            "description": row["description"], "specs": json.loads(row["specs"]),
+            # Descriptions remain searchable locally, but marketing prose is not
+            # needed in the model payload or the structured product presentation.
+            "specs": json.loads(row["specs"]),
             "status": row["status"], "stock_quantity": int(row["stock_quantity"]),
             "available": available, "list_price_brl": formatar_dinheiro(price),
             "promotion_percent": str(discount if available else 0),
@@ -114,7 +109,6 @@ class Tools:
         Select available product offers across the entire catalog.
         """
         # Calcula detalhes somente para produtos com promoção positiva ativa.
-        # Calculate details only for products with an active positive promotion.
         promoted_ids = {int(p["product_id"]) for p in self.store.tables["promotions"]
                         if p["is_active"] == "1" and Decimal(p["discount_percent"]) > 0}
         offers = [self._montar_produto(row) for product_id, row in self.store.products.items()
@@ -124,7 +118,6 @@ class Tools:
     def listar_promocoes(self, category_id: int | None, max_price_brl: float | None,
                               limit: int) -> dict:
         # Filtra o catálogo inteiro antes do limite para não omitir ofertas de outras páginas.
-        # Filter the entire catalog before limiting to avoid missing offers on other pages.
         """Filtra todas as ofertas antes de limitar a lista; informa os totais.
         Filter all offers before limiting the list; report total counts.
         """
@@ -144,7 +137,6 @@ class Tools:
     def buscar_produtos(self, query: str, max_price_brl: float | None,
                         available_only: bool, limit: int, category_id: int | None = None) -> dict:
         # Exige todos os termos no texto combinado; não executa SQL nem código do modelo.
-        # Require all terms in the combined text; execute no model-written SQL or code.
         """Busca termos e aplica categoria, estoque e orcamento antes do limite.
         Match terms and apply category, stock and budget filters before the limit.
         """
@@ -173,7 +165,6 @@ class Tools:
 
     def detalhar_produto(self, product_id: int) -> dict:
         """Retorna especificacoes e precos calculados de um produto existente.
-        Return source specifications and calculated prices for an existing product.
         """
         row = self.store.products.get(product_id)
         return self._montar_produto(row) if row else {"error": "product_not_found"}
@@ -196,7 +187,6 @@ class Tools:
 
     def _pedido_autorizado(self, order_id: int) -> dict | None:
         """Retorna o pedido somente se pertencer ao cliente da sessao.
-        Return the order only when it belongs to the session customer.
         """
         order = self.store.orders.get(order_id)
         if (self.session.customer_id is None or order is None
@@ -215,13 +205,11 @@ class Tools:
 
     def consultar_pedido(self, order_id: int) -> dict:
         """Verifica acesso e retorna somente campos permitidos do pedido.
-        Check ownership and return only allowed order fields.
         """
         order = self._pedido_autorizado(order_id)
         if order is None:
             return self._negar_acesso()
         # Retorna só campos permitidos; exclui identidade, contatos e notas livres.
-        # Return only allowed fields; exclude identity, contacts and free-text notes.
         result = {key: order[key] for key in ("order_id", "order_date", "status", "total_brl",
                                                "payment_method", "tracking_code", "estimated_delivery")}
         result["items"] = [{"quantity": int(r["quantity"]),
@@ -245,7 +233,6 @@ class Tools:
     def avaliar_devolucao(self, order_id: int, reason: str, received_date: str | None,
                       online_purchase: bool | None, original_condition: bool | None) -> dict:
         """Verifica acesso, datas e fatos ausentes; apenas avalia, sem emitir reembolso.
-        Check ownership, dates and missing facts; assess only, never issue a refund.
         """
         order = self._pedido_autorizado(order_id)
         if order is None:
@@ -287,7 +274,6 @@ class Tools:
 
     def cotar_pagamento(self, product_id: int, quantity: int, method: str, installments: int) -> dict:
         """Valida estoque e parcelas e calcula uma cotacao com Decimal, sem cobrar.
-        Validate stock and installments and calculate a Decimal quote without charging.
         """
         product = self.detalhar_produto(product_id)
         if "error" in product:
@@ -301,23 +287,25 @@ class Tools:
         minimum = Decimal(50 if installments <= 3 else 80 if installments <= 6 else 100)
         if method == "credit" and total / installments < minimum:
             # Sugere um limite calculado; o cliente ainda escolhe e pede nova cotacao.
-            # Suggest a calculated limit; the customer still chooses a new quote.
             allowed = [count for count in range(1, 13)
                        if total / count >= (50 if count <= 3 else 80 if count <= 6 else 100)]
             return {"error": "installment_below_minimum", "minimum_brl": formatar_dinheiro(minimum),
+                    "product_id": product_id, "product_name": product['name'],
+                    "requested_installments": installments,
                     "total_brl": formatar_dinheiro(total),
                     "max_allowed_installments": max(allowed, default=0),
                     "shipping_included": False, "quote_only": True,
                     "note": "No payment made. Ask the customer to choose a supported count, then quote again. Section 3.1; staff confirmation required."}
         # Divide em centavos e distribui a sobra: a soma fecha e a diferença é de até R$ 0,01.
-        # Divide integer cents and distribute the remainder: exact total, at most BRL 0.01 apart.
         base_cents, extra_cents = divmod(int(total * 100), installments)
         amounts = [formatar_dinheiro(Decimal(base_cents + (i < extra_cents)) / 100)
                    for i in range(installments)]
         return {"product_id": product_id, "product_name": product["name"], "quantity": quantity,
                 "unit_price_brl": formatar_dinheiro(unit),
                 "total_brl": formatar_dinheiro(total), "method": method, "installments": installments,
-                "approx_installment_brl": formatar_dinheiro(total / installments), "interest_percent": 0,
+                "installment_minimum_brl": formatar_dinheiro(minimum) if method == 'credit' else None,
+                "installment_rule": "Section 3.1: 1-3 installments minimum BRL 50; 4-6 minimum BRL 80; 7-12 minimum BRL 100. A price-specific maximum is not a store-wide cap.",
+                "interest_percent": 0,
                 "installment_amounts_brl": amounts,
                 "promotion_percent": product["promotion_percent"], "discounts_stack": False,
                 "shipping_included": False, "quote_only": True,
@@ -367,5 +355,4 @@ SCHEMAS = [
 ]
 
 # As mesmas regras alimentam a API e a validação local, sem busca repetida na lista.
-# The same rules feed the API and local validation without repeated list searches.
 PARAMETROS_FERRAMENTAS = {tool["name"]: tool["parameters"] for tool in SCHEMAS}

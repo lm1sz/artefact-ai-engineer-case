@@ -72,8 +72,8 @@ class ProviderTests(unittest.TestCase):
             with self.assertRaises(ProviderError):
                 OpenAIProvider("test").responder(instructions="", items=[], tool_choice="auto")
 
-    def test_only_gpt61_is_selected_even_with_legacy_provider_environment(self):
-        with patch.dict(os.environ, {"LLM_PROVIDER": "gemini", "GEMINI_API_KEY": "unused",
+    def test_openai_is_default_even_with_unused_gemini_key(self):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "unused",
                                      "OPENAI_API_KEY": "local-test"}, clear=True):
             settings = configuracao_provedor()
             self.assertEqual(settings["provider"], "openai")

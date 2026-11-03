@@ -35,7 +35,6 @@ def localizar_dados(explicit: str | None = None) -> Path:
 class Store:
     def __init__(self, directory: Path):
         """Carrega CSVs e valida relacionamentos; o PDF sera lido sob demanda.
-        Load CSVs and validate relationships; read the PDF on demand.
         """
         self.directory = directory
         self.tables = {}
@@ -103,7 +102,6 @@ class Store:
 
     def mascarar_dados(self, text: str) -> str:
         """Mascara contatos reconhecidos e nomes conhecidos; nao detecta todo dado pessoal.
-        Mask recognized contacts and known names; this is not a general personal-data detector.
         """
         for row in self.customers.values():
             for campo, replacement in (("name", row["name"].split()[0] if row["name"].strip() else "[customer]"),

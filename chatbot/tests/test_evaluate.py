@@ -4,12 +4,33 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 from pathlib import Path
 
 from chatbot.scripts.evaluate import verificar_chamadas
+from chatbot.scripts import evaluate
+from chatbot.rate_limits import RateLimitError
 
 
 class EvaluationTests(unittest.TestCase):
+    def test_daily_quota_blocks_remaining_scenarios_without_new_calls(self):
+        provider = Mock()
+        provider.source_bootstrap = False
+        provider.diagnostics = {}
+        provider.responder.side_effect = RateLimitError('tokens_per_day', None)
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {}, clear=True):
+            with patch.object(sys, 'argv', ['evaluate', '--live', '--output', folder]), \
+                 patch.object(evaluate, 'criar_provedor', return_value=provider), \
+                 patch.object(evaluate, 'configuracao_provedor', return_value={
+                     'provider': 'test', 'model': 'test', 'reasoning_effort': None}), \
+                 patch('builtins.print'), self.assertRaises(SystemExit):
+                evaluate.principal()
+            report = json.loads((Path(folder) / 'run.json').read_text(encoding='utf-8'))
+        self.assertEqual(provider.responder.call_count, 1)
+        self.assertEqual(len(report['scenarios']), 5)
+        self.assertTrue(all(not s['completed'] for s in report['scenarios']))
+        self.assertTrue(all(s['turns'][0]['reason'] == 'tokens_per_day' for s in report['scenarios']))
+
     def test_offline_scenarios_run_without_credentials_or_valid_model_environment(self):
         with tempfile.TemporaryDirectory() as folder:
             env = {**os.environ, "OPENAI_API_KEY": "", "OPENAI_MODEL": "not-a-model"}

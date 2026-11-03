@@ -1,0 +1,4 @@
+# Runtime versions verified in an isolated Python environment.
+# Install with: python -m pip install -c requirements.lock -e .
+pypdf==6.21.4
+tzdata==2026.6

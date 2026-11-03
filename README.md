@@ -98,5 +98,3 @@ Offline evaluation uses scripted calls and reference wording, explicitly labeled
 ## AI assistance and submission
 
 I used OpenAI Codex to help implement and revise code, investigate failures, write tests and prepare documentation and demonstrations. My inputs included the challenge requirements, provider choice, operational rules and interactive review of the tool flow. The repository distinguishes completed tool execution, protocol tests and the demonstration capture method.
-
-The challenge requests a public GitHub repository with genuine progress and interaction examples. Its delivery instructions say to email the link; the recruiting email instead requests English answers through Google Forms and permits PDF. Materials are prepared without sending a message or submitting the form. The final source revision must be published before the evaluator downloads it; no push or submission is performed automatically.

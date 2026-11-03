@@ -207,7 +207,7 @@ def principal():
     report['input_sha256'] = {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                              for p in inputs if p.is_file()}
     provider = None if args.offline else criar_provedor()
-    quota_block = None
+    provider_block = None
     for scenario in SCENARIOS:
         if args.scenario and scenario["name"] != args.scenario:
             continue
@@ -230,17 +230,17 @@ def principal():
             start = perf_counter()
             first_tool = len(tools.evidencias)
             try:
-                # A daily quota applies to the account, not just this scenario.
-                # Keep the remaining scenarios visible without more HTTP calls.
-                if quota_block is not None:
-                    raise quota_block
+                # Account access/quota failures affect the remaining scenarios too.
+                # Keep them visible without repeating rejected API requests.
+                if provider_block is not None:
+                    raise provider_block
                 reply = agent.perguntar(question)
             except ProviderError as error:
-                if getattr(error, "reason", None) in ('tokens_per_day', 'requests_per_day'):
-                    quota_block = error
+                if error.status_code in (401, 403, 429):
+                    provider_block = error
                 registro["completed"] = False
                 registro["turns"].append({"question": question, "error": str(error),
-                    "reason": getattr(error, "reason", None),
+                    "status_code": error.status_code,
                     "elapsed_seconds": round(perf_counter() - start, 3),
                     "tool_calls": tools.evidencias[first_tool:]})
                 content.extend([f"**Customer:** {question}", "", f"**Execution error:** {error}", ""])
@@ -253,13 +253,11 @@ def principal():
             flags = verificar_chamadas(calls, tools.evidencias[first_tool:])
             registro["turns"][-1]["review_flags"] = flags
             registro["review_flags"].extend(flags)
-            report["provider_diagnostics"] = getattr(provider, "diagnostics", {})
             (output / "run.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         content.extend(["## Review criteria", "", REVIEW[scenario["name"]], "",
                         "Automated call checks: " + ("; ".join(registro["review_flags"]) or "no flags"),
                         "Answer quality still requires human review; these checks are not a model-quality score.", ""])
         (output / f"{scenario['name']}.md").write_text("\n".join(content), encoding="utf-8")
-        report["provider_diagnostics"] = getattr(provider, "diagnostics", {})
         (output / "run.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"Exported {scenario['name']} ({'completed' if registro['completed'] else 'failed'})", flush=True)
     print(f"Evidence saved to: {output}")

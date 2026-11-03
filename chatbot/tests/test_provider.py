@@ -97,6 +97,21 @@ class ProviderTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 configuracao_provedor()
 
+    def test_other_providers_are_rejected_before_any_request(self):
+        with patch.dict(os.environ, {'LLM_PROVIDER': 'another-provider', 'OPENAI_API_KEY': 'test'}, clear=True):
+            with patch('urllib.request.urlopen') as http:
+                with self.assertRaisesRegex(ValueError, 'LLM_PROVIDER must be openai'):
+                    criar_provedor()
+                http.assert_not_called()
+
+    def test_openai_quota_status_is_preserved_without_exposing_body(self):
+        error = urllib.error.HTTPError('https://api.openai.com', 429, '', {}, io.BytesIO(b'private details'))
+        with patch('urllib.request.urlopen', side_effect=error):
+            with self.assertRaises(ProviderError) as caught:
+                OpenAIProvider('test').responder(instructions='', items=[], tool_choice='auto')
+        self.assertEqual(caught.exception.status_code, 429)
+        self.assertNotIn('private details', str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -89,8 +89,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(agent.tools.denied, 1)
 
     def test_provider_quota_error_is_visible_without_fabricated_answer(self):
-        error = ProviderError('Quota exceeded; wait.')
-        error.retry_after = 10
+        error = ProviderError('Quota exceeded; wait.', status_code=429)
         self.provider.responder.side_effect = error
         headers, _ = self.session()
         code, _, body = self.request('POST', '/api/chat', '{"message":"hi"}', headers)

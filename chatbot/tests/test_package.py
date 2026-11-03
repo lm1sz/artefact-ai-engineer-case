@@ -18,5 +18,5 @@ class DeliveryPackageTests(unittest.TestCase):
             self.assertNotIn(secret.decode(), str(caught.exception))
 
     def test_documented_placeholders_and_runtime_configuration_are_allowed(self):
-        validar_arquivo('chatbot/.env.example', b'GROQ_API_KEY=\nOPENAI_API_KEY=\n')
-        validar_arquivo('README.md', b'GROQ_API_KEY=your-local-groq-key')
+        validar_arquivo('chatbot/.env.example', b'OPENAI_API_KEY=\n')
+        validar_arquivo('README.md', b'OPENAI_API_KEY=your-local-openai-key')

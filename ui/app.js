@@ -10,8 +10,7 @@ let csrf = '';
 let busy = false;
 let cooldownUntil = 0;
 
-// A browser retry cannot increase the provider's quota. Keep repeated sends
-// disabled until the server's indicated waiting period has elapsed.
+// Respect the local server's cooldown when another request is in progress.
 setInterval(() => {
   const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
   send.disabled = busy || !csrf || remaining > 0;

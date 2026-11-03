@@ -132,7 +132,8 @@ def criar_handler(state, ui_directory=None):
             except (ValueError, UnicodeError):
                 return self._json(400, {'error': 'Mensagem inválida; use de 1 a 4.000 caracteres.'})
             if not state.model_lock.acquire(blocking=False):
-                return self._json(429, {'error': 'Há uma resposta em andamento. Aguarde antes de enviar outra mensagem.'})
+                return self._json(429, {'error': 'Há uma resposta em andamento. Aguarde antes de enviar outra mensagem.',
+                                        'retry_after': 1})
             try:
                 if path == '/api/reset':
                     session['agent'].limpar_historico()
@@ -140,9 +141,7 @@ def criar_handler(state, ui_directory=None):
                 reply = session['agent'].perguntar(payload['message'])
                 self._json(200, {'answer': reply.text, 'tools': reply.tools, 'checks': reply.checks})
             except ProviderError as error:
-                self._json(429 if hasattr(error, 'retry_after') else 502, {
-                    'error': str(error), 'retry_after': getattr(error, 'retry_after', None),
-                    'reason': getattr(error, 'reason', None)})
+                self._json(429 if error.status_code == 429 else 502, {'error': str(error)})
             except Exception:
                 self._json(500, {'error': 'Não foi possível concluir a resposta. Tente novamente.'})
             finally:

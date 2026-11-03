@@ -1,6 +1,4 @@
-"""Configuração explícita da OpenAI ou Groq, sem troca automática.
-Explicit OpenAI or Groq configuration, without automatic fallback.
-"""
+"""OpenAI Responses transport and configuration for gpt-6.1-sol."""
 import json
 import os
 import urllib.error
@@ -9,7 +7,6 @@ from pathlib import Path
 
 from .agent import Provider, ProviderError
 from .tools import SCHEMAS
-from .groq import GroqProvider, MODELO_GROQ
 
 MODELO = "gpt-6.1-sol"
 ESFORCOS = ("", "low", "medium", "high", "xhigh", "max")
@@ -61,7 +58,7 @@ class OpenAIProvider:
             return result
         except urllib.error.HTTPError as error:
             # Do not echo error bodies: they may contain input, credentials or private context.
-            raise ProviderError(f"Provider request failed (HTTP {error.code}). Check model access, reasoning setting, quota, and key locally.") from None
+            raise ProviderError(f"Provider request failed (HTTP {error.code}). Check model access, reasoning setting, quota, and key locally.", status_code=error.code) from None
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
             raise ProviderError("Could not reach the provider or decode its response. Please retry.") from None
 
@@ -70,17 +67,8 @@ def configuracao_provedor() -> dict:
     """Le o provedor e modelo escolhidos sem expor a chave da API.
     """
     provider = os.getenv("LLM_PROVIDER", "openai").strip().lower()
-    if provider == "groq":
-        model = os.getenv("GROQ_MODEL", MODELO_GROQ).strip()
-        reasoning = os.getenv("GROQ_REASONING_EFFORT", "medium").strip()
-        if model != MODELO_GROQ:
-            raise ValueError(f"Set GROQ_MODEL={MODELO_GROQ}.")
-        if reasoning not in ("low", "medium", "high"):
-            raise ValueError("GROQ_REASONING_EFFORT must be low, medium or high.")
-        return {"provider": "groq", "model": model, "reasoning_effort": reasoning,
-                "api_key_configured": bool(os.getenv("GROQ_API_KEY", "").strip())}
     if provider != "openai":
-        raise ValueError("LLM_PROVIDER must be openai or groq.")
+        raise ValueError("LLM_PROVIDER must be openai.")
     model = os.getenv("OPENAI_MODEL", MODELO).strip()
     reasoning = os.getenv("OPENAI_REASONING_EFFORT", "medium").strip()
     if model != MODELO:
@@ -95,7 +83,5 @@ def criar_provedor() -> Provider:
     """Instancia apenas o provedor configurado, sem troca automatica em falhas.
     """
     settings = configuracao_provedor()
-    if settings["provider"] == "groq":
-        return GroqProvider(os.getenv("GROQ_API_KEY", ""), settings["model"], settings["reasoning_effort"])
     return OpenAIProvider(os.getenv("OPENAI_API_KEY", ""), settings["model"],
                           settings["reasoning_effort"])

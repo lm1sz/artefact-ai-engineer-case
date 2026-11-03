@@ -9,15 +9,13 @@ from pathlib import Path
 
 from chatbot.scripts.evaluate import verificar_chamadas
 from chatbot.scripts import evaluate
-from chatbot.rate_limits import RateLimitError
+from chatbot.agent import ProviderError
 
 
 class EvaluationTests(unittest.TestCase):
-    def test_daily_quota_blocks_remaining_scenarios_without_new_calls(self):
+    def test_openai_quota_error_blocks_remaining_scenarios_without_new_calls(self):
         provider = Mock()
-        provider.source_bootstrap = False
-        provider.diagnostics = {}
-        provider.responder.side_effect = RateLimitError('tokens_per_day', None)
+        provider.responder.side_effect = ProviderError('OpenAI quota exceeded.', status_code=429)
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {}, clear=True):
             with patch.object(sys, 'argv', ['evaluate', '--live', '--output', folder]), \
                  patch.object(evaluate, 'criar_provedor', return_value=provider), \
@@ -29,7 +27,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(provider.responder.call_count, 1)
         self.assertEqual(len(report['scenarios']), 5)
         self.assertTrue(all(not s['completed'] for s in report['scenarios']))
-        self.assertTrue(all(s['turns'][0]['reason'] == 'tokens_per_day' for s in report['scenarios']))
+        self.assertTrue(all(s['turns'][0]['status_code'] == 429 for s in report['scenarios']))
 
     def test_offline_scenarios_run_without_credentials_or_valid_model_environment(self):
         with tempfile.TemporaryDirectory() as folder:

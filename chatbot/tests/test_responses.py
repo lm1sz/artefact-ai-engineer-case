@@ -1,11 +1,7 @@
-import json
 import unittest
-from unittest.mock import patch
 
 from chatbot.agent import Agent, ProviderError
 from chatbot.data import Store, localizar_dados
-from chatbot.groq import GroqProvider
-from chatbot.rate_limits import interpretar_429, segundos
 from chatbot.responses import detectar_idioma, oferta_fora_do_escopo, resposta_catalogo, resposta_pagamentos
 from chatbot.tools import Tools
 from test_agent import RecordedProvider, answer, call
@@ -168,30 +164,3 @@ class CatalogGroundingTests(unittest.TestCase):
         self.assertIn('2 × R$ 99,99 + 4 × R$ 99,98', reply.text)
         self.assertNotIn('som superior', reply.text)
         self.assertEqual(reply.checks, ['catalog_rendered_from_tools', 'payment_rendered_from_tools'])
-
-
-class RateLimitTests(unittest.TestCase):
-    def test_duration_units(self):
-        self.assertEqual(segundos('1m2.5s'), 62.5)
-        self.assertEqual(segundos('300ms'), .3)
-        self.assertIsNone(segundos('invalid'))
-
-    def test_tpm_metadata_is_safe_and_retryable(self):
-        body = json.dumps({'error': {'message': 'secret-org tokens per minute: Limit 8000, Used 7000, Requested 2000. Please try again in 12.5s'}}).encode()
-        error = interpretar_429({}, body)
-        self.assertEqual(error.reason, 'tokens_per_minute')
-        self.assertEqual(error.retry_after, 12.5)
-        self.assertEqual(error.limits['limit'], 8000)
-        self.assertNotIn('secret-org', str(error))
-
-    def test_daily_and_oversized_requests_do_not_retry(self):
-        for phrase in ('tokens per day', 'requests per day', 'Request too large'):
-            error = interpretar_429({'retry-after': '2'}, json.dumps({'error': {'message': phrase}}).encode())
-            self.assertIsNone(error.retry_after)
-
-    def test_proactive_wait_uses_observed_headers(self):
-        provider = GroqProvider('test')
-        with patch('chatbot.groq.monotonic', return_value=100), patch('chatbot.groq.sleep') as sleep:
-            provider._registrar_limites({'x-ratelimit-remaining-tokens': '5', 'x-ratelimit-reset-tokens': '2s'})
-            provider._aguardar_capacidade({'messages': ['a' * 100]})
-        sleep.assert_called_once_with(2.25)

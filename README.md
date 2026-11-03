@@ -57,7 +57,6 @@ The prompt defines the store's tone, when to consult each source, language prefe
 
 Catalog replies present structured specifications directly. A wood species does not imply solid construction, tone or durability. Marketing descriptions remain searchable locally but are omitted from model payloads. Payment replies use Python's exact cent amounts. This standardized presentation can require a follow-up for mixed requests.
 
-The optional Groq adapter remains explicitly selectable with `LLM_PROVIDER=groq`, `GROQ_API_KEY` and `GROQ_MODEL=openai/gpt-oss-120b`. There is no automatic provider/model fallback. Its quota handling uses observed headers and one bounded transient retry; daily quotas are not retried. No claim of comparative quality, cost or latency is made.
 
 ## Rules and limitations
 
@@ -89,7 +88,7 @@ To repeat the capture workflow, run `python chatbot/scripts/interactive_demo.py 
 .\.venv\Scripts\python.exe chatbot/scripts/evaluate.py --live
 ```
 
-The local suite passed 93 chatbot tests and 6 UI tests after the package separation. It covers data validation, payment/promotion boundaries, grounding, returns, privacy, history, provider protocol and HTTP sessions. Provider tests use simulated responses. The OpenAI adapter's continuation/tool protocol is tested; evaluator-specific access is checked with their key. Source checks do not establish API connectivity or conversational quality.
+The local suite covers data validation, payment/promotion boundaries, grounding, returns, privacy, history, provider protocol and HTTP sessions. Provider tests use simulated responses. The OpenAI adapter's continuation/tool protocol is tested; evaluator-specific access is checked with their key. Source checks do not establish API connectivity or conversational quality.
 
 Offline evaluation uses scripted calls and reference wording, explicitly labeled and saved under ignored `chatbot/private/offline-evaluation/`. API evaluations save separate timestamped traces and input hashes under `chatbot/private/live-evaluation/`. Review wording and exact arguments; automatic call flags are inspection prompts, not quality scores.
 

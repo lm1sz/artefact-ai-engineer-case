@@ -13,8 +13,10 @@ dependencies = ["pypdf>=5,<7", "tzdata>=2025.1"]
 emporio = "chatbot.cli:principal"
 
 [tool.setuptools.packages.find]
-include = ["chatbot*"]
+include = ["chatbot*", "ui"]
 namespaces = false
 
 [tool.setuptools.package-data]
 chatbot = ["prompt.txt", "data/*.csv", "data/*.pdf"]
+
+ui = ["*.html", "*.css", "*.js"]
